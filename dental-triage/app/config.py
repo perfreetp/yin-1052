@@ -29,3 +29,9 @@ NO_SHOW_REASONS = [
     "时间冲突", "交通不便", "临时有事", "症状缓解",
     "改约他院", "价格因素", "家人反对", "未提醒", "其他",
 ]
+
+SLA_NORMAL_TRIAGE_HOURS = 2.0
+SLA_URGENT_TRIAGE_HOURS = 0.5
+SLA_NORMAL_DISPATCH_HOURS = 4.0
+SLA_URGENT_DISPATCH_HOURS = 1.0
+

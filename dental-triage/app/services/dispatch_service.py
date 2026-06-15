@@ -43,6 +43,8 @@ def recommend_clinics(
     results = []
     for c in clinics:
         is_open = is_clinic_open_on(c.business_hours or "", target_weekday)
+        if target_weekday is not None and not is_open:
+            continue
         dist = None
         if patient_lat is not None and patient_lon is not None:
             dist = _haversine_km(patient_lat, patient_lon, c.latitude, c.longitude)

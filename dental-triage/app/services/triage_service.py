@@ -80,7 +80,7 @@ def recommend_clinic(
         return None
     if patient_lat is None or patient_lon is None:
         for c in clinics:
-            if is_clinic_open_on(c.business_hours or "", target_weekday):
+            if target_weekday is None or is_clinic_open_on(c.business_hours or "", target_weekday):
                 return c.id
         return clinics[0].id
 
@@ -90,7 +90,7 @@ def recommend_clinic(
         dist = _haversine_km(patient_lat, patient_lon, c.latitude, c.longitude)
         if dist <= CLINIC_SEARCH_RADIUS_KM:
             all_clinics_in_range.append((dist, c))
-            if is_clinic_open_on(c.business_hours or "", target_weekday):
+            if target_weekday is None or is_clinic_open_on(c.business_hours or "", target_weekday):
                 open_clinics.append((dist, c))
 
     if open_clinics:
