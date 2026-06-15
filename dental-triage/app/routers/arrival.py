@@ -8,6 +8,11 @@ from app.services import arrival_service
 router = APIRouter(prefix="/arrival", tags=["到店确认"])
 
 
+@router.get("/no-show-reasons", response_model=list[str], summary="未到店原因列表")
+def get_no_show_reasons():
+    return arrival_service.get_no_show_reasons()
+
+
 @router.post("", response_model=ArrivalOut, summary="到店确认")
 def confirm_arrival(req: ArrivalConfirmRequest, db: Session = Depends(get_db)):
     try:
@@ -22,8 +27,3 @@ def get_arrival(lead_id: int, db: Session = Depends(get_db)):
     if not record:
         raise HTTPException(status_code=404, detail="到店确认记录不存在")
     return record
-
-
-@router.get("/no-show-reasons/list", response_model=list[str], summary="未到店原因列表")
-def get_no_show_reasons():
-    return arrival_service.get_no_show_reasons()

@@ -24,9 +24,10 @@ def recommend_clinics(
     patient_lat: Optional[float] = None,
     patient_lon: Optional[float] = None,
     direction: Optional[str] = None,
+    preferred_time: Optional[str] = Query(None, description="期望到店时间，如'周六上午'"),
     db: Session = Depends(get_db),
 ):
-    return dispatch_service.recommend_clinics(db, patient_lat, patient_lon, direction)
+    return dispatch_service.recommend_clinics(db, patient_lat, patient_lon, direction, preferred_time)
 
 
 @router.get("/recommend-doctors", response_model=List[DoctorRecommendation], summary="推荐医生")

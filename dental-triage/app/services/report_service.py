@@ -96,25 +96,45 @@ def _build_clinic_reports(db: Session, lead_ids: list[int]) -> list[ClinicConver
         disp_lead_ids = [d.lead_id for d in dispatches]
         if not disp_lead_ids:
             continue
-        arrived = db.query(ArrivalConfirmation).filter(
+        arrived_q = db.query(ArrivalConfirmation).filter(
             ArrivalConfirmation.lead_id.in_(disp_lead_ids),
             ArrivalConfirmation.arrival_status == ArrivalStatusEnum.ARRIVED,
-        ).count()
+        )
+        arrived = arrived_q.count()
         no_show = db.query(ArrivalConfirmation).filter(
             ArrivalConfirmation.lead_id.in_(disp_lead_ids),
             ArrivalConfirmation.arrival_status == ArrivalStatusEnum.NOT_ARRIVED,
         ).count()
         total_disp = len(disp_lead_ids)
+
+        hit = 0
+        partial = 0
+        miss = 0
+        for a in arrived_q.all():
+            if a.triage_hit == TriageHitEnum.HIT:
+                hit += 1
+            elif a.triage_hit == TriageHitEnum.PARTIAL:
+                partial += 1
+            elif a.triage_hit == TriageHitEnum.MISS:
+                miss += 1
+        triage_total = hit + partial + miss
+
         reports.append(ClinicConversionReport(
             clinic_id=c.id,
             clinic_name=c.name,
             total_leads=total_disp,
-            triaged_count=0,
+            triaged_count=total_disp,
             dispatched_count=total_disp,
             arrived_count=arrived,
             no_show_count=no_show,
             conversion_rate=round(arrived / total_disp * 100, 2) if total_disp else 0.0,
             no_show_rate=round(no_show / total_disp * 100, 2) if total_disp else 0.0,
+            triage_hit_count=hit,
+            triage_partial_count=partial,
+            triage_miss_count=miss,
+            triage_total_confirmed=triage_total,
+            triage_accuracy_rate=round(hit / triage_total * 100, 2) if triage_total else 0.0,
+            triage_miss_rate=round(miss / triage_total * 100, 2) if triage_total else 0.0,
         ))
     return reports
 

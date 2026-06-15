@@ -7,6 +7,7 @@ from app.config import DIRECTION_KEYWORDS, URGENT_KEYWORDS, SCRIPT_TEMPLATES, CL
 from app.models.lead import Lead, LeadStatusEnum
 from app.models.triage import TriageRecord, ConsultationTypeEnum
 from app.models.clinic import Clinic
+from app.utils.time_utils import infer_target_weekday, is_clinic_open_on
 from app.schemas.triage import TriageRequest, TriageManualRequest, KeywordAnalysisResult
 
 
@@ -67,20 +68,38 @@ def _haversine_km(lat1, lon1, lat2, lon2) -> float:
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-def recommend_clinic(db: Session, patient_lat: Optional[float], patient_lon: Optional[float]) -> Optional[int]:
+def recommend_clinic(
+    db: Session,
+    patient_lat: Optional[float],
+    patient_lon: Optional[float],
+    preferred_time: Optional[str] = None,
+) -> Optional[int]:
+    target_weekday = infer_target_weekday(preferred_time)
     clinics = db.query(Clinic).filter(Clinic.is_active == True).all()
     if not clinics:
         return None
     if patient_lat is None or patient_lon is None:
+        for c in clinics:
+            if is_clinic_open_on(c.business_hours or "", target_weekday):
+                return c.id
         return clinics[0].id
-    best_clinic = None
-    best_dist = float("inf")
+
+    open_clinics = []
+    all_clinics_in_range = []
     for c in clinics:
         dist = _haversine_km(patient_lat, patient_lon, c.latitude, c.longitude)
-        if dist < best_dist and dist <= CLINIC_SEARCH_RADIUS_KM:
-            best_dist = dist
-            best_clinic = c
-    return best_clinic.id if best_clinic else clinics[0].id
+        if dist <= CLINIC_SEARCH_RADIUS_KM:
+            all_clinics_in_range.append((dist, c))
+            if is_clinic_open_on(c.business_hours or "", target_weekday):
+                open_clinics.append((dist, c))
+
+    if open_clinics:
+        open_clinics.sort(key=lambda x: x[0])
+        return open_clinics[0][1].id
+    if all_clinics_in_range:
+        all_clinics_in_range.sort(key=lambda x: x[0])
+        return all_clinics_in_range[0][1].id
+    return clinics[0].id
 
 
 def auto_triage(db: Session, req: TriageRequest) -> TriageRecord:
@@ -91,7 +110,7 @@ def auto_triage(db: Session, req: TriageRequest) -> TriageRecord:
         raise ValueError(f"线索状态为 {lead.status.value}，无法分诊")
 
     analysis = analyze_keywords(lead.chief_complaint, lead.keywords)
-    clinic_id = recommend_clinic(db, lead.patient_latitude, lead.patient_longitude)
+    clinic_id = recommend_clinic(db, lead.patient_latitude, lead.patient_longitude, lead.preferred_time)
 
     record = TriageRecord(
         lead_id=lead.id,
@@ -121,7 +140,7 @@ def manual_triage(db: Session, req: TriageManualRequest) -> TriageRecord:
     if req.is_urgent:
         script_hint = SCRIPT_TEMPLATES.get("急痛", script_hint)
 
-    clinic_id = recommend_clinic(db, lead.patient_latitude, lead.patient_longitude)
+    clinic_id = recommend_clinic(db, lead.patient_latitude, lead.patient_longitude, lead.preferred_time)
 
     record = TriageRecord(
         lead_id=lead.id,

@@ -12,6 +12,12 @@ class ClinicConversionReport(BaseModel):
     no_show_count: int = 0
     conversion_rate: float = 0.0
     no_show_rate: float = 0.0
+    triage_hit_count: int = 0
+    triage_partial_count: int = 0
+    triage_miss_count: int = 0
+    triage_total_confirmed: int = 0
+    triage_accuracy_rate: float = 0.0
+    triage_miss_rate: float = 0.0
 
 
 class TriageHitReport(BaseModel):

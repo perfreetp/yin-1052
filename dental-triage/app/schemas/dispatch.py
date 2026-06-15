@@ -32,6 +32,8 @@ class ClinicRecommendation(BaseModel):
     clinic_id: int
     clinic_name: str
     distance_km: Optional[float] = None
+    is_open: bool = True
+    business_hours: Optional[str] = None
     has_matching_doctor: bool
     available_doctors_count: int
 

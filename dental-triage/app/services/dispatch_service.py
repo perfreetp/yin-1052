@@ -8,6 +8,7 @@ from app.models.lead import Lead, LeadStatusEnum
 from app.models.triage import TriageRecord
 from app.models.clinic import Clinic, Doctor
 from app.models.dispatch import Dispatch, DispatchStatusEnum
+from app.utils.time_utils import infer_target_weekday, is_clinic_open_on
 from app.schemas.dispatch import (
     DispatchRequest,
     DispatchOut,
@@ -35,10 +36,13 @@ def recommend_clinics(
     patient_lat: Optional[float],
     patient_lon: Optional[float],
     direction: Optional[str] = None,
+    preferred_time: Optional[str] = None,
 ) -> List[ClinicRecommendation]:
+    target_weekday = infer_target_weekday(preferred_time)
     clinics = db.query(Clinic).filter(Clinic.is_active == True).all()
     results = []
     for c in clinics:
+        is_open = is_clinic_open_on(c.business_hours or "", target_weekday)
         dist = None
         if patient_lat is not None and patient_lon is not None:
             dist = _haversine_km(patient_lat, patient_lon, c.latitude, c.longitude)
@@ -53,12 +57,15 @@ def recommend_clinics(
                 clinic_id=c.id,
                 clinic_name=c.name,
                 distance_km=round(dist, 2) if dist is not None else None,
+                is_open=is_open,
+                business_hours=c.business_hours,
                 has_matching_doctor=len(matching) > 0,
                 available_doctors_count=len([d for d in matching if d.available_slots > 0]),
             )
         )
     results.sort(key=lambda x: x.distance_km if x.distance_km is not None else 9999)
     results.sort(key=lambda x: (0 if x.has_matching_doctor else 1))
+    results.sort(key=lambda x: 0 if x.is_open else 1)
     return results
 
 
@@ -118,9 +125,14 @@ def auto_dispatch(db: Session, req: DispatchRequest) -> Dispatch:
 
     target_clinic_id = req.preferred_clinic_id or triage.recommended_clinic_id
     if not target_clinic_id:
-        clinics = recommend_clinics(db, lead.patient_latitude, lead.patient_longitude, triage.direction)
+        clinics = recommend_clinics(
+            db, lead.patient_latitude, lead.patient_longitude,
+            triage.direction, lead.preferred_time,
+        )
         if clinics:
-            best = [c for c in clinics if c.has_matching_doctor and c.available_doctors_count > 0]
+            best = [c for c in clinics if c.is_open and c.has_matching_doctor and c.available_doctors_count > 0]
+            if not best:
+                best = [c for c in clinics if c.has_matching_doctor and c.available_doctors_count > 0]
             target_clinic_id = (best[0] if best else clinics[0]).clinic_id if clinics else None
 
     if not target_clinic_id:

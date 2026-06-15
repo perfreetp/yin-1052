@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import engine, Base
-from app.routers import lead, triage, dispatch, arrival, report
+from app.routers import lead, triage, dispatch, arrival, report, queue
 
 Base.metadata.create_all(bind=engine)
 
